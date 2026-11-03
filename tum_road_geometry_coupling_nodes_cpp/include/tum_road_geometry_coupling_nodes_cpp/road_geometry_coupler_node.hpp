@@ -56,7 +56,7 @@ private:
   void on_sub_inputs(
     nav_msgs::msg::Odometry::ConstSharedPtr odom,
     geometry_msgs::msg::AccelWithCovarianceStamped::ConstSharedPtr accel);
-  void step();
+  void step(const builtin_interfaces::msg::Time & stamp);
 
   message_filters::Subscriber<nav_msgs::msg::Odometry> odometry_sub_;
   message_filters::Subscriber<geometry_msgs::msg::AccelWithCovarianceStamped> accel_sub_;

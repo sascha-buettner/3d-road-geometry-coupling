@@ -57,12 +57,12 @@ void RoadGeometryCouplerNode::on_sub_inputs(
   model_->set_odometry(tam::type_conversions::odometry_type_from_msg(*odom));
   model_->set_acceleration(
     tam::type_conversions::accel_with_covariance_stamped_type_from_msg(*accel));
-  step();
+  step(odom->header.stamp);
 }
-void RoadGeometryCouplerNode::step()
+void RoadGeometryCouplerNode::step(const builtin_interfaces::msg::Time & stamp)
 {
   model_->step();
-  auto stamp = get_clock()->now();
+  // Preserve the acquisition time for consumers combining these with model readouts.
   auto odom_msg = tam::type_conversions::odometry_msg_from_type(model_->get_transformed_odometry());
   auto accel_msg = tam::type_conversions::accel_with_covariance_stamped_msg_from_type(
     model_->get_transformed_acceleration());
