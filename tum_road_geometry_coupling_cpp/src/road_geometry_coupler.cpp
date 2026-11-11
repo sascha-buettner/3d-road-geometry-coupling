@@ -121,14 +121,9 @@ bool RoadGeometryCoupler::init()
     std::make_unique<MeasurementTransformer>(active_track_, measurement_transformer_params_);
 
   // Create the road plane transformer
-  if (lookbehind_points_ < 0) throw std::invalid_argument("Negative road-plane lookbehind");
-  const auto initial = initial_pose_enabled_ ? initial_pose_ : to_cartesian_pose_2d(input_odometry_road_plane_);
-  const auto matching = initial_pose_enabled_
-    ? CurvilinearPose(active_track_->get_cosy_handle()->convert_to_sn_and_get_idx_global(
-        initial.x_m, initial.y_m, 0., initial.yaw_rad))
-    : *active_track_matching_result_;
   road_plane_transformer_ = std::make_unique<RoadPlaneGeometryTransformer>(
-    active_track_, matching, initial, static_cast<std::size_t>(lookbehind_points_));
+    active_track_, *active_track_matching_result_,
+    to_cartesian_pose_2d(input_odometry_road_plane_));
 
   // After this step, init was successful
   return true;
@@ -154,7 +149,6 @@ void RoadGeometryCoupler::set_active_track(Track * track, CurvilinearPose * matc
 bool RoadGeometryCoupler::switch_active_track(
   tam::types::control::Odometry const & global_cartesian_odometry)
 {
-  if (!allow_pitlane_switching_) return false;
   // Check the current state
   bool is_on_track = check_on_track_global(*raceline_, global_cartesian_odometry);
   bool is_on_pitlane = check_on_track_global(*pitlane_, global_cartesian_odometry);

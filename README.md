@@ -160,25 +160,6 @@ docker run -it --rm road-geometry-coupling
 
 > **Important — keep the vehicle progressing gradually along the track.** Internally, the geometry transformation works on a rolling segment of the reference line that is rebuilt on demand as the vehicle advances. If the vehicle's road-plane pose jumps too far ahead in a single step, the next call to `step()` may land outside the current segment and the rebuild can produce inconsistent results. As a rule of thumb, **keep the per-step longitudinal progress below \~10&nbsp;m**, which is well within the safe range for any realistic simulation timestep.
 
-### Common body/contact chart for closed laps
-
-`RoadGeometryCoupler` exposes optional parameter-handler controls for simulations
-that also query a tire-road surface:
-
-- `road_plane.allow_pitlane_switching` (default `true`): set `false` for a closed
-  racing lap to prevent lateral curb excursions selecting an auxiliary pitlane.
-- `road_plane.lookbehind_points` (default `0`): use the same rolling-chart history
-  as the contact surface (`10` for the Imola five-point setup).
-- `road_plane.initial_pose.enabled` (default `false`) plus `x_m`, `y_m` and
-  `yaw_rad` under `road_plane.initial_pose`: anchor both charts at the same
-  configured initial model pose, before the first published moving pose.
-
-Defaults retain legacy routing and initialization. Matching the initial anchor
-matters because the rolling chart is path dependent; anchoring only at the first
-published sample can introduce a small persistent registration error. The
-`common_contact_chart` test checks the common-chart protocol over repeated laps
-and excursions outside nominal track bounds.
-
 ### 4.1. Python
 
 ```python

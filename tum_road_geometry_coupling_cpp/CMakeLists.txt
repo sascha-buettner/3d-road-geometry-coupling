@@ -57,13 +57,4 @@ ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET) # so client can 
 ament_export_dependencies(${MODEL_DEPENDENCIES}) # other dependencies so client does not need to call find_package on them
 
 
-if(BUILD_TESTING)
-  enable_testing()
-  foreach(test_name common_contact_chart road_periodic ribbon_height_map ribbon_envelope ribbon_envelope_bounds ribbon_support_gaps)
-    add_executable(${test_name}_test test/${test_name}.cpp)
-    target_link_libraries(${test_name}_test ${PROJECT_NAME})
-    target_compile_features(${test_name}_test PRIVATE cxx_std_20)
-    add_test(NAME ${test_name} COMMAND ${test_name}_test)
-  endforeach()
-endif()
 ament_package()

@@ -36,8 +36,8 @@ RoadPlaneGeometryTransformer::calculate_road_plane_segment(
     size_t prev_idx = (idx == 0) ? 0 : idx - 1;  // Safe access of index
     double s_dist{0.0};
     if (idx == 0) {
-      prev_idx = s_track.size() - 2;
-      s_dist = s_track.back() - s_track[prev_idx];
+      prev_idx = s_track.size() - 1;
+      s_dist = s_track[prev_idx] - s_track[prev_idx - 1];
     } else {
       s_dist = s_track[idx] - s_track[prev_idx];
     }
@@ -80,7 +80,6 @@ void RoadPlaneGeometryTransformer::extend_road_plane_segment(
   auto matching_result = current_segment_.ref_line->convert_to_sn_and_get_idx_global_2d(
     current_pose_road_plane.x_m, current_pose_road_plane.y_m, current_pose_road_plane.yaw_rad);
   size_t local_idx = std::get<1>(matching_result);
-  local_idx = local_idx > lookbehind_points_ ? local_idx - lookbehind_points_ : 0;
   double sigma_start = current_segment_.sigma_m[local_idx];
 
   CartesianPose2D root_pose;
@@ -93,55 +92,61 @@ void RoadPlaneGeometryTransformer::extend_road_plane_segment(
     root_pose, wrap_index(current_segment_.root_idx + local_idx, track_max_idx_));
 }
 void RoadPlaneGeometryTransformer::calculate_curvilinear_pose(
-  CartesianPose2D const & pose, CurvilinearPoseWithDiagnostics & result)
+  CartesianPose2D const & road_plane_pose, CurvilinearPoseWithDiagnostics & pose_ref)
 {
-  result = project_point(pose);
-  if (result.diagnostics.current_local_index > REBUILD_RATIO * DEFAULT_SEGMENT_LENGTH) {
-    extend_road_plane_segment(pose);
-    result = project_point(pose);
+  // First transform the road plane pose to curvilinear pose with respect to the segment
+  auto curvilinear_pose_segment =
+    CurvilinearPose(current_segment_.ref_line->convert_to_sn_and_get_idx_global(
+      road_plane_pose.x_m, road_plane_pose.y_m, 0.0, road_plane_pose.yaw_rad));
+
+  // Check if we need to rebuild the segment
+  if (curvilinear_pose_segment.idx > REBUILD_RATIO * DEFAULT_SEGMENT_LENGTH) {
+    // Rebuild the segment
+    extend_road_plane_segment(road_plane_pose);
+    // Match again to the newly calculated segment.
+    curvilinear_pose_segment =
+      CurvilinearPose(current_segment_.ref_line->convert_to_sn_and_get_idx_global(
+        road_plane_pose.x_m, road_plane_pose.y_m, 0.0, road_plane_pose.yaw_rad));
   }
-}
-RoadPlaneGeometryTransformer::CurvilinearPoseWithDiagnostics
-RoadPlaneGeometryTransformer::project_point(CartesianPose2D const & pose) const
-{
-  CurvilinearPoseWithDiagnostics result;
-  const CurvilinearPose local(current_segment_.ref_line->convert_to_sn_and_get_idx_global(
-    pose.x_m, pose.y_m, 0., pose.yaw_rad));
-  result.pose.n_m = local.n_m;
-  result.pose.chi_rad = local.chi_rad;
-  result.pose.idx = wrap_index(local.idx + current_segment_.root_idx, track_max_idx_);
-  // Preserve the double-precision local station. The helper's fractional
-  // index is float and would quantize a 10,000-point track by about 0.25 mm.
-  const double length = track_->s_coord().back();
-  result.pose.s_m = std::fmod(track_->s_coord()[current_segment_.root_idx] + local.s_m, length);
-  if (result.pose.s_m < 0.) result.pose.s_m += length;
-  result.diagnostics.current_local_index = local.idx;
-  result.diagnostics.current_sigma = local.s_m;
-  result.diagnostics.current_n = local.n_m;
-  result.diagnostics.segment_root_idx = current_segment_.root_idx;
-  const auto xy = current_segment_.ref_line->convert_to_cartesian(local.s_m, 0., 0.);
-  result.diagnostics.ref_line_pose = {xy[0], xy[1], xy[2]};
-  return result;
+  // Directly assign the values that align in the segment and the track frame
+  pose_ref.pose.n_m = curvilinear_pose_segment.n_m;
+  pose_ref.pose.chi_rad = curvilinear_pose_segment.chi_rad;
+
+  // Calculate the track index the current positions belongs to
+  pose_ref.pose.idx =
+    wrap_index(curvilinear_pose_segment.idx + current_segment_.root_idx, track_max_idx_);
+  // Calculate the s coordinate in the global track
+  pose_ref.pose.s_m =
+    tam::helpers::numerical::interp_from_idx(track_->s_coord(), pose_ref.pose.idx);
+
+  // Fill diagnostics
+  pose_ref.diagnostics.current_local_index = curvilinear_pose_segment.idx;
+  pose_ref.diagnostics.current_sigma = curvilinear_pose_segment.s_m;
+  pose_ref.diagnostics.current_n = curvilinear_pose_segment.n_m;
+  pose_ref.diagnostics.segment_root_idx = current_segment_.root_idx;
+
+  // Fill out the point on the ref line
+  auto xy_yaw =
+    current_segment_.ref_line->convert_to_cartesian(curvilinear_pose_segment.s_m, 0.0, 0.0);
+  pose_ref.diagnostics.ref_line_pose.x_m = xy_yaw[0];
+  pose_ref.diagnostics.ref_line_pose.y_m = xy_yaw[1];
+  pose_ref.diagnostics.ref_line_pose.yaw_rad = xy_yaw[2];
 }
 RoadPlaneGeometryTransformer::RoadPlaneGeometryTransformer(
   Track const * track, CurvilinearPose const & curvilinear_pose_on_track,
-  CartesianPose2D const & current_pose_road_plane, std::size_t lookbehind_points)
-: track_{track},
-  track_max_idx_{static_cast<std::size_t>(track_->s_coord().size() - 1)},
-  lookbehind_points_{std::min(lookbehind_points, DEFAULT_SEGMENT_LENGTH / 4)}
+  CartesianPose2D const & current_pose_road_plane)
+: track_{track}, track_max_idx_{static_cast<std::size_t>(track_->s_coord().size())}
 {
   // Calculate the starting point of the roadplane segment so that it gives
   // the same curvilinear pose as on the track
-  std::size_t root_index = static_cast<std::size_t>(curvilinear_pose_on_track.idx) % track_max_idx_;
+  std::size_t root_index =
+    static_cast<std::size_t>(curvilinear_pose_on_track.idx) % track->s_coord().size();
 
   CartesianPose2D root_pose_road_plane;
 
   // Find the offset between the current s and the last point in the raceline file
   // (Start the segment directly on a point of the ref line to align the indices)
-  const double fraction = curvilinear_pose_on_track.idx - std::floor(curvilinear_pose_on_track.idx);
-  const double next_s =
-    root_index + 1 < track_max_idx_ ? track_->s_coord()[root_index + 1] : track_->s_coord().back();
-  double delta_s = fraction * (next_s - track_->s_coord()[root_index]);
+  double delta_s = curvilinear_pose_on_track.s_m - track->s_coord()[root_index];
 
   // Calculate the root pose of the road plane segment
   root_pose_road_plane.yaw_rad =
@@ -153,24 +158,6 @@ RoadPlaneGeometryTransformer::RoadPlaneGeometryTransformer(
                              delta_s * std::sin(root_pose_road_plane.yaw_rad) -
                              curvilinear_pose_on_track.n_m * std::cos(root_pose_road_plane.yaw_rad);
 
-  // Integrate backwards with the same circular arcs used in forward segment
-  // construction. This reserves physical space behind the vehicle at the seam.
-  for (std::size_t k = 0; k < lookbehind_points_; ++k) {
-    const auto previous = (root_index + track_max_idx_ - 1) % track_max_idx_;
-    const double ds = root_index == 0 ? track_->s_coord().back() - track_->s_coord()[previous]
-                                      : track_->s_coord()[root_index] - track_->s_coord()[previous];
-    const double curvature = .5 * (track_->omega_z()[root_index] + track_->omega_z()[previous]);
-    const double angle = root_pose_road_plane.yaw_rad - ds * curvature;
-    double lon = ds, lat = 0.;
-    if (std::abs(curvature) > 1e-6) {
-      lon = std::sin(curvature * ds) / curvature;
-      lat = (1 - std::cos(curvature * ds)) / curvature;
-    }
-    root_pose_road_plane.x_m -= lon * std::cos(angle) - lat * std::sin(angle);
-    root_pose_road_plane.y_m -= lon * std::sin(angle) + lat * std::cos(angle);
-    root_pose_road_plane.yaw_rad = angle;
-    root_index = previous;
-  }
   // Now calculate the segment starting from the corresponding root pose
   current_segment_ = calculate_road_plane_segment(root_pose_road_plane, root_index);
 }

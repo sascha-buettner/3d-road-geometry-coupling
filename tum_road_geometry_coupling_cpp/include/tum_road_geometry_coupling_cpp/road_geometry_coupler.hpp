@@ -1,7 +1,6 @@
 // Copyright 2025 Simon Sagmeister
 #pragma once
 #include <limits>
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <tum_helpers_cpp/coordinate_system/curvilinear_cosy.hpp>
@@ -37,18 +36,6 @@ public:
     param_manager_->declare_parameter(
       "disable", &disabled_, false, tam::pmg::ParameterType::BOOL,
       "Disable the Track Geometry Influence Module");
-    param_manager_->declare_parameter("road_plane.allow_pitlane_switching", &allow_pitlane_switching_, true,
-      tam::pmg::ParameterType::BOOL, "Allow automatic switching onto the auxiliary pitlane");
-    param_manager_->declare_parameter("road_plane.lookbehind_points", &lookbehind_points_, std::int64_t{0},
-      tam::pmg::ParameterType::INTEGER, "Reference points reserved behind the chart origin");
-    param_manager_->declare_parameter("road_plane.initial_pose.enabled", &initial_pose_enabled_, false,
-      tam::pmg::ParameterType::BOOL, "Anchor the chart before the first published sample");
-    param_manager_->declare_parameter("road_plane.initial_pose.x_m", &initial_pose_.x_m, 0.,
-      tam::pmg::ParameterType::DOUBLE, "Configured initial planar X");
-    param_manager_->declare_parameter("road_plane.initial_pose.y_m", &initial_pose_.y_m, 0.,
-      tam::pmg::ParameterType::DOUBLE, "Configured initial planar Y");
-    param_manager_->declare_parameter("road_plane.initial_pose.yaw_rad", &initial_pose_.yaw_rad, 0.,
-      tam::pmg::ParameterType::DOUBLE, "Configured initial planar yaw");
   }
   /// Convenience constructor for users that do not have a separate pitlane.
   /// The same \c TrackData is used for both raceline and pitlane, so the
@@ -130,9 +117,5 @@ private:
 
   // Helper to disable the module.
   bool disabled_ = false;
-  bool allow_pitlane_switching_ = true;
-  bool initial_pose_enabled_ = false;
-  std::int64_t lookbehind_points_ = 0;
-  CartesianPose2D initial_pose_{0., 0., 0.};
 };
 }  // namespace tam::road_geometry_coupling
