@@ -32,9 +32,12 @@ public:
 public:
   RoadPlaneGeometryTransformer(
     Track const * track, CurvilinearPose const & curvilinear_pose_on_track,
-    CartesianPose2D const & current_pose_road_plane);
+    CartesianPose2D const & current_pose_road_plane, std::size_t lookbehind_points = 0);
   CurvilinearPoseWithDiagnostics transform_to_global_curvilinear_pose(
     CartesianPose2D const & road_plane_pose);
+  // Query a point in the current segment without moving the segment. A contact
+  // batch advances using the vehicle centre, then projects all its tire points.
+  CurvilinearPoseWithDiagnostics project_point(CartesianPose2D const & road_plane_pose) const;
 
 private:
   inline static const std::size_t DEFAULT_SEGMENT_LENGTH = 100;
@@ -53,6 +56,7 @@ private:
   RoadPlaneSegment current_segment_{};
   Track const * track_ = nullptr;
   std::size_t track_max_idx_ = 0;
+  std::size_t lookbehind_points_ = 0;
 
 protected:  // Make this protected to be able to use this in a child class for debugging purposes
   // Calculate the the upcoming roadplane segment

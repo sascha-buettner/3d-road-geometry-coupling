@@ -48,3 +48,20 @@ auto vehicle_load = coupler.get_vehicle_load();
 - `tsl_logger_cpp` &mdash; debug signal logging
 - `param_management_cpp` &mdash; runtime parameter access
 - Eigen3
+
+## Indexed ribbon residuals
+
+`RibbonHeightMap` loads a version-2 sparse strip grid bound to an exact physical
+reference CSV. Its periodic bilinear sample returns height and derivatives with
+explicit missing coverage. `envelope` finds the continuous circular contact
+maximum at crossed cell edges and stationary points. Conservative per-cell and
+8×8-block maxima reduce the exact search; `allow_bounds=false` supplies the
+exhaustive reference for numerical tests. The cache is derived at load time and
+does not change the file format. No allocation occurs in an envelope query.
+
+A small missing centre can be supported only when both support brackets within half the wheel radius are
+valid; the returned flag distinguishes this from observed coverage. Wider gaps
+and one-sided crop boundaries remain invalid. The source extraction package in
+`iac_sim/tools/relative_track_extraction` produces matching assets and Blender
+meshes. A residual is road-normal displacement, not a second absolute road force;
+the large-scale geometry coupler continues to supply the ribbon contribution.
