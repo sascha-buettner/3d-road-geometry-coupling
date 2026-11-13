@@ -168,7 +168,7 @@ that also query a tire-road surface:
 - `road_plane.allow_pitlane_switching` (default `true`): set `false` for a closed
   racing lap to prevent lateral curb excursions selecting an auxiliary pitlane.
 - `road_plane.lookbehind_points` (default `0`): use the same rolling-chart history
-  as the contact surface (`10` for the Imola five-point setup).
+  as the contact surface (`10` for the generic five-point setup).
 - `road_plane.initial_pose.enabled` (default `false`) plus `x_m`, `y_m` and
   `yaw_rad` under `road_plane.initial_pose`: anchor both charts at the same
   configured initial model pose, before the first published moving pose.
